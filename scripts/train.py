@@ -1,4 +1,4 @@
-"""Backward-compatible wrapper for `cartoon_diffusion.cli.train`."""
+"""Canonical training CLI wrapper."""
 
 from cartoon_diffusion.cli.train import main
 

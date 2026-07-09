@@ -1,4 +1,4 @@
-"""Backward-compatible 100k training wrapper."""
+"""Canonical 100k training CLI wrapper."""
 
 import sys
 

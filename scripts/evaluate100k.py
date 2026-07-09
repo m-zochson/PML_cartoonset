@@ -1,8 +1,8 @@
-"""Backward-compatible 100k training wrapper."""
+"""Canonical 100k evaluation CLI wrapper."""
 
 import sys
 
-from cartoon_diffusion.cli.train import main
+from cartoon_diffusion.cli.evaluate import main
 
 
 if __name__ == "__main__":

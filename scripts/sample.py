@@ -1,4 +1,4 @@
-"""Backward-compatible wrapper for `cartoon_diffusion.cli.sample_grid`."""
+"""Canonical sample-grid CLI wrapper."""
 
 from cartoon_diffusion.cli.sample_grid import main
 

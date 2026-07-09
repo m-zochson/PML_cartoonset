@@ -1,4 +1,4 @@
-"""Backward-compatible wrapper for `cartoon_diffusion.cli.run_all_tests`."""
+"""Canonical evaluation-suite CLI wrapper."""
 
 from cartoon_diffusion.cli.run_all_tests import main
 

@@ -1,0 +1,14 @@
+dataset_variant: 10k
+root: data/cartoonset10k
+attrs:
+  - eye_color
+  - hair_color
+  - face_color
+image_size: 32
+batch: 16
+steps: 20
+timesteps: 1000
+limit: 64
+workers: 0
+save_every: 20
+run_dir: runs/debug

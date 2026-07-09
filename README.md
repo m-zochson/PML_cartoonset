@@ -1,103 +1,141 @@
-# Conditional DDPM on Cartoon Set (Classifier-Free Guidance)
+# Conditional DDPM on Cartoon Set
 
-Conditional denoising diffusion model that generates Google Cartoon Set faces
-controlled by categorical attributes, using **classifier-free guidance (CFG)**.
-The novelty over the course material (which covers unconditional DDPMs) is the
-attribute conditioning + CFG: a tunable guidance weight `w` at sampling time.
+This project trains a class-conditional Denoising Diffusion Probabilistic Model
+on Google's Cartoon Set. Generation is controlled by categorical attributes
+(`eye_color`, `hair_color`, `face_color`) and uses classifier-free guidance
+(CFG), so the guidance weight `w` can be swept at sampling time.
 
-## Requirements
+## Environment
 
+The project is managed with `uv` and targets Python 3.12:
+
+```bash
+uv sync
 ```
-pip install torch torchvision pillow numpy
-```
 
-Use a CUDA-enabled torch build for GPU training. All scripts are
-device-agnostic (`cuda` if available, else `cpu`) — the same code runs on the
-laptop (CPU, debugging) and on the desktop (GTX 1080, full training).
+The default PyTorch source in `pyproject.toml` is the CUDA 12.6 wheel index
+(`https://download.pytorch.org/whl/cu126`). If the training machine needs a
+newer CUDA wheel, change only the `pytorch-cu126` index/source entries to the
+appropriate PyTorch index such as `cu128`, then rerun `uv sync`.
+
+Verify the environment with:
+
+```bash
+uv run python -c "import torch; print(torch.__version__, torch.cuda.is_available())"
+uv run pytest
+```
 
 ## Data
 
-Download the Cartoon Set from https://google.github.io/cartoonset/ (start with
-the **10k** set), extract it, and point `--root` at the folder of paired files:
+Download Cartoon Set from https://google.github.io/cartoonset/ and extract it
+under `data/`:
 
-```
+```text
 data/cartoonset10k/
-    csXXXX.png      # RGBA, transparent background
-    csXXXX.csv      # 18 rows: "attr_name", "value_index", "cardinality"
+    csXXXX.png
+    csXXXX.csv
+
+data/cartoonset100k/
+    0/csXXXX.png
+    0/csXXXX.csv
     ...
 ```
 
-Images are resized to 32x32 and the transparent background is composited on
-white. Conditioning defaults to three low-cardinality colour attributes:
-`eye_color` (5), `hair_color` (10), `face_color` (11). Change with `--attrs`.
+The unified dataset loader recursively discovers image/CSV pairs, so both the
+flat 10k layout and nested 100k layout work. Images are resized to 32x32,
+alpha-composited onto white, and normalized to `[-1, 1]`.
 
-## Project structure
+Inspect a dataset:
 
-| file          | role                                                          |
-|---------------|---------------------------------------------------------------|
-| `dataset.py`  | Cartoon Set dataset: alpha compositing, attribute parsing, dataloader |
-| `model.py`    | Conditional U-Net `eps_theta(x_t, t, c)` with per-attribute embeddings + null token for CFG |
-| `diffusion.py`| Gaussian diffusion: schedule, training loss (with CFG dropout), DDPM + DDIM sampling |
-| `train.py`    | Training loop with EMA and checkpointing                      |
-| `sample.py`   | Qualitative attribute x guidance-weight image grids           |
-| `evaluate.py` | Attribute classifier + conditioning-fidelity metric vs `w`    |
-
-## Quick test on a laptop (CPU)
-
-Verifies the full chain runs; **not** meant to produce good images. Finishes in
-about a minute with these tiny settings. Use a throwaway `--ckpt` name for test
-runs so they never collide with a real training checkpoint.
-
-```
-python dataset.py data/cartoonset10k
-python train.py    --root data/cartoonset10k --limit 64 --steps 20 --batch 16 --workers 0 --save_every 20 --ckpt test_ckpt.pt
-python sample.py   --ckpt test_ckpt.pt --vary hair_color --weights 0 3 --steps 10 --out grid_test.png
-python evaluate.py --root data/cartoonset10k --ckpt test_ckpt.pt --weights 0 3 --n_samples 16 --steps 10 --clf_epochs 1 --clf_batch 16
+```bash
+uv run python dataset.py data/cartoonset10k
+uv run python dataset100k.py data/cartoonset100k --cache
 ```
 
-Noisy images, flat loss, and near-random accuracy are expected here.
+## Project Structure
 
-## Full run on the desktop (GPU)
-
+```text
+src/cartoon_diffusion/
+  data.py          unified 10k/100k dataset loader with optional cache
+  model.py         conditional U-Net
+  diffusion.py     DDPM/DDIM process and classifier-free guidance
+  training.py      EMA, resume, checkpointing, train loop
+  classifier.py    attribute classifier used for fidelity evaluation
+  generation.py    batched DDPM/DDIM generation helpers
+  metrics.py       fidelity, diversity, variance metrics
+  results.py       typed result rows and schema-compatible save/load
+  evaluation.py    high-level evaluation orchestration
+  sampling.py      annotated guidance-weight grids
+  plotting.py      result plotting with legacy/new schema support
+  cli/             command-line entrypoints
+configs/           reusable YAML experiment configs
+docs/              report and presentation-facing material
+scripts/           canonical thin wrappers
+notebooks/         interactive sampler notebook
+tests/             smoke/unit tests
+results/           tracked experiment artifacts
 ```
-# 1. train (checkpoints to training_finale.pt)
-python train.py --root data/cartoonset10k --steps 40000 --batch 128 --ckpt training_finale.pt
 
-# 2. qualitative grid: rows = hair_color values, cols = guidance weights
-python sample.py --ckpt training_finale.pt --vary hair_color --weights 0 1 3 5 --steps 50 --out grid_hair.png
+Root-level files such as `train.py`, `evaluate.py`, and `sample.py` are kept as
+thin compatibility wrappers for the original commands.
 
-# 3. quantitative: attribute fidelity vs guidance weight
-python evaluate.py --root data/cartoonset10k --ckpt training_finale.pt --weights 0 1 3 5 --n_samples 512 --steps 50
+## Quick CPU Smoke Test
+
+This verifies the full pipeline on a tiny subset. The images and metrics will
+not be meaningful.
+
+```bash
+uv run python train.py --config configs/debug.yaml
+uv run python sample.py --run_dir runs/debug --vary hair_color --weights 0 3 --sampler ddim --ddim_steps 10
+uv run python evaluate.py --run_dir runs/debug --root data/cartoonset10k --weights 0 3 --n_samples 16 --sampler ddim --ddim_steps 10 --clf_epochs 1 --clf_batch 16
 ```
 
-## Checkpoint naming and safety
+## Full Runs
 
-- **`--ckpt` controls the output file.** Always give test/debug runs their own
-  name (e.g. `--ckpt test_ckpt.pt`) so they can never overwrite a real training
-  checkpoint. If `--ckpt` is omitted, `train.py` auto-generates a timestamped
-  name (`run_YYYYmmdd_HHMMSS.pt`) instead of defaulting to a single shared
-  filename, precisely to avoid accidental collisions between runs.
-- **One level of backup rotation** is still built in as a safety net: if the
-  target checkpoint file already exists, it is renamed to `<name>.bak` right
-  before the new one is written. This only protects against a single
-  accidental overwrite — a second overwrite in a row will also overwrite the
-  `.bak`. Don't rely on it instead of using distinct names.
-- **Avoid syncing the working folder with OneDrive/Dropbox/etc.** while
-  training: cloud sync rewriting a large `.pt` file mid-write is a common cause
-  of "corrupted zip archive" errors when loading a checkpoint. Keep the project
-  in a plain local folder, or pause sync during training.
+The preferred workflow is config + run directory. Each run directory collects
+the training config (`config.yaml`), command snapshots (`eval_config.yaml` and
+`sample_config.yaml`), checkpoint, classifier, metric files, and generated
+grids.
+
+Train on 10k:
+
+```bash
+uv run python scripts/train.py --config configs/train_10k_40k.yaml
+```
+
+Train or resume on 100k:
+
+```bash
+uv run python scripts/train.py --config configs/train_100k.yaml
+uv run python scripts/train.py --config configs/train_100k.yaml --resume --steps 70000
+```
+
+Sample qualitative grids. DDPM is the default reported sampler; DDIM is kept as
+a fast preview/artifact reproduction path.
+
+```bash
+uv run python scripts/sample.py --run_dir runs/run_full_40k --vary hair_color --weights 0 1 3 5
+uv run python scripts/sample.py --run_dir runs/run_full_40k --vary hair_color --weights 0 1 3 5 --sampler ddim --ddim_steps 50
+```
+
+Run metrics:
+
+```bash
+uv run python scripts/evaluate.py --config configs/eval_10k.yaml --test fidelity
+uv run python scripts/run_all_tests.py --dataset_variant 100k --root data/cartoonset100k --ckpt runs/run100k/checkpoints/latest.pt --results_dir runs/run100k/results
+uv run python scripts/plot_results.py
+```
+
+Explicit CLI flags still work and override config values, so one-off changes do
+not require editing the YAML files.
 
 ## Notes
 
-- **EMA weights** (`ckpt["ema"]`) are used for all sampling/evaluation; they
-  give cleaner samples than the raw weights.
-- **DDPM vs DDIM**: training uses `T=1000`. For sampling, `sample.py` and
-  `evaluate.py` use DDIM (`--steps 50`) — far faster, same trained model. Full
-  `ddpm_sample` (1000 steps) is available in `diffusion.py` for best quality.
-- **Guidance weight**: `w=0` is unconditional-mixed; higher `w` sharpens
-  attribute adherence at some cost to diversity. The fidelity table should rise
-  with `w` then plateau — that is the CFG story to report.
-- **Resuming / more data**: for the 100k set pass `preload=False` in the
-  dataset to avoid loading everything into RAM.
-- **FID** is intentionally omitted (needs InceptionV3 weights). Add it on the
-  desktop with `torchmetrics.image.fid.FrechetInceptionDistance` or `pytorch-fid`.
+- New checkpoints include raw weights, EMA weights, optimizer state, attributes,
+  image size, and diffusion timesteps. Old checkpoints without optimizer state
+  still load for sampling/evaluation and can resume with a warning.
+- New result JSON files use a flat schema (`weight`, attributes, `mean`) plus
+  `schema_version=2`; plotting also accepts the legacy `per_attribute` schema.
+- `docs/report.md` contains the project report.
+- `data/`, `checkpoints/`, `outputs/`, and `runs/` are local artifacts and
+  ignored by git.

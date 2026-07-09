@@ -109,7 +109,8 @@ where $\varnothing$ is a special *null* condition standing for "unconditional". 
 
 The Cartoon Set (Google) provides 2D cartoon avatars, each described by 18 categorical attributes (e.g. `hair_color`, `eye_color`, `face_color`, `glasses`). Each image `csXXXX.png` is stored as RGBA (with a transparent background) alongside a `csXXXX.csv` file containing, one per line, `"attr_name", value_index, cardinality`. The project uses the 10k subset at $32\times32$ resolution as the starting point.
 
-Preprocessing steps (all in `dataset.py`):
+Preprocessing steps (implemented in `cartoon_diffusion.data`, with `dataset.py`
+kept as a compatibility wrapper):
 
 1. **Alpha compositing.** The transparent background is composited onto a solid white background; otherwise the network would waste capacity modelling meaningless noise around the figure.
 2. **Resize** to $32\times32$ (bilinear). The flat, low-texture nature of cartoon art makes low resolution effective and cheap to train.
@@ -120,18 +121,23 @@ Preprocessing steps (all in `dataset.py`):
 
 ## 4. Implementation
 
-The codebase is six modules, all device-agnostic (`cuda` if available else `cpu`) so identical code runs on a laptop CPU for debugging and on the desktop GPU for the real training run.
+The implementation is now organized as a small Python package under
+`src/cartoon_diffusion`, with root-level scripts kept only as compatibility
+wrappers. The code remains device-agnostic (`cuda` if available else `cpu`) so
+the same commands run on a laptop CPU for debugging and on a desktop GPU for
+the full experiments. The environment is managed by `uv` with a Python 3.12
+project file and a CUDA PyTorch wheel index.
 
-### 4.1 `dataset.py` — data pipeline
+### 4.1 `cartoon_diffusion.data` — data pipeline
 
-Implements `CartoonSetDataset`, which scans the folder for `.png` files, pairs each with its `.csv`, parses labels once, and stacks the selected attribute indices into an $(N, n_\text{attr})$ tensor. Two design points worth noting:
+Implements a single `CartoonSetDataset` for both the flat 10k folder and the nested 100k folder. It recursively scans for `.png` files, pairs each image with its `.csv`, parses labels once, and stacks the selected attribute indices into an $(N, n_\text{attr})$ tensor. Two design points worth noting:
 
-- **Preloading.** At $32\times32$, the 10k images occupy $\approx 123$ MB, so all images are decoded once into a single tensor at init, making training free of disk I/O. (`preload=False` for the 100k set.)
+- **Preloading and cache.** At $32\times32$, the 10k images fit easily in memory. For the 100k set, preprocessing can also be cached as a compact uint8 tensor under the data folder, with atomic cache writes and a `--rebuild_cache` option.
 - **`attribute_dims`** exposes the list of cardinalities $[5, 10, 11]$, consumed by the model to size its embedding tables.
 
 A `limit` argument restricts the number of images, enabling fast CPU debugging (`--limit 64`).
 
-### 4.2 `model.py` — conditional U-Net
+### 4.2 `cartoon_diffusion.model` — conditional U-Net
 
 The network $\epsilon_\theta(\mathbf{x}_t, t, c)$ is a compact U-Net ($\approx 4.4$ M parameters at `base`=64) with the following ingredients.
 
@@ -142,7 +148,7 @@ The network $\epsilon_\theta(\mathbf{x}_t, t, c)$ is a compact U-Net ($\approx 4
 
 The helper `null_labels(B)` returns the all-null condition $[K_0, K_1, \dots]$, used to form the unconditional prediction in Eq. (5).
 
-### 4.3 `diffusion.py` — the diffusion process
+### 4.3 `cartoon_diffusion.diffusion` — the diffusion process
 
 Implements `GaussianDiffusion` with a linear $\beta$ schedule ($\beta_1 = 10^{-4}$ to $\beta_T = 0.02$, $T = 1000$) and precomputed $\alpha_t, \bar\alpha_t, \sqrt{\bar\alpha_t}, \sqrt{1-\bar\alpha_t}$:
 
@@ -152,25 +158,30 @@ Implements `GaussianDiffusion` with a linear $\beta$ schedule ($\beta_1 = 10^{-4
 - `ddim_sample` — fast deterministic sampling (default 50 steps), with guidance. Kept in the codebase for reference and rapid iteration during development, but **not used for reported results** after the artifact described in Section 5.1 was identified.
 - `_guided_eps` — combines conditional and unconditional predictions via Eq. (5); $w=0$ short-circuits to a single forward.
 
-### 4.4 `train.py` — training loop
+### 4.4 `cartoon_diffusion.training` — training loop
 
 A standard loop (Adam, $\text{lr} = 2\times10^{-4}$) with two additions relevant to diffusion:
 
 - **EMA** (exponential moving average, decay $0.999$) of the model weights. Diffusion samples are noticeably cleaner from EMA weights, so a shadow copy is maintained and saved alongside the raw weights.
-- **Checkpointing.** Every `--save_every` steps the full state (raw + EMA weights, attribute dims, image size, timesteps) is saved. If `--ckpt` is omitted, a timestamped filename is generated so separate runs never collide; a one-level `.bak` rotation guards against a single accidental overwrite.
+- **Checkpointing and resume.** Every `--save_every` steps the full state (raw + EMA weights, optimizer state, attribute dims, image size, timesteps) is saved. If `--ckpt` is omitted, a timestamped filename is generated so separate runs never collide; a one-level `.bak` rotation guards against a single accidental overwrite. Old checkpoints without optimizer state still load, with a warning when resuming.
 
-### 4.5 `sample.py` — qualitative grids
+The single training CLI supports both `--dataset_variant 10k` and `--dataset_variant 100k`; `train.py` and `train100k.py` are thin wrappers around this implementation. Reusable YAML configs live under `configs/`, and `--run_dir` stores a run-local checkpoint path plus the effective training config.
+
+### 4.5 `cartoon_diffusion.sampling` — qualitative grids
 
 Loads a checkpoint (EMA weights) and produces an image grid whose rows are the values of a chosen attribute and whose columns are guidance weights, with the other attributes held fixed. The *same starting noise* is reused per row across columns, so only $w$ changes and the effect of guidance is visually isolated — the figure for the presentation. **Grids used in this report are generated with full DDPM sampling (Section 5.1); the script also supports DDIM for quick low-cost previews during development, but those are not used for any reported figure.**
 
-### 4.6 `evaluate.py` — quantitative evaluation
+### 4.6 Evaluation, metrics, results, and plotting
 
-Two components:
+The evaluation code is split by responsibility:
 
-- **Attribute classifier.** A small multi-head CNN (shared conv backbone, one linear head per attribute) trained on the *real* images. This is the measuring instrument, independent of the generator, and cached to disk so it is trained only once.
-- **Attribute fidelity vs. $w$.** For each guidance weight, the generator produces images from random attribute vectors; the classifier then predicts each attribute, and fidelity is the fraction of generated images whose attribute matches the one requested. Sweeping $w$ produces the central quantitative result.
+- **`classifier.py`.** A small multi-head CNN (shared conv backbone, one linear head per attribute) trained on the *real* images. This is the measuring instrument, independent of the generator, and cached to disk so it is trained only once.
+- **`generation.py`.** Shared helpers for sampling random attribute vectors and dispatching to DDPM or DDIM.
+- **`metrics.py`.** The fidelity, diversity, and variance experiments. For fidelity, the generator produces images from random attribute vectors; the classifier predicts each attribute, and fidelity is the fraction of generated images whose attribute matches the requested one.
+- **`results.py`.** Typed result-row objects and JSON/CSV saving. New fidelity runs use a flat row schema (`weight`, each attribute, `mean`) with `schema_version=2`.
+- **`evaluation.py`.** Thin orchestration: load checkpoint, prepare classifier if needed, run the selected metric, and save results.
 
-Both `evaluate.py` and `evaluate100k.py` expose a `--sampler {ddim,ddpm}` flag. **`ddpm` is the setting used for every reported number**; `ddim` is retained only to reproduce the sampler-artifact comparison in Section 5.1.
+The unified evaluator exposes a `--sampler {ddpm,ddim}` flag. **`ddpm` is the setting used for every reported number**; `ddim` is retained only to reproduce the sampler-artifact comparison in Section 5.1. The plotting utility reads both the new flat schema and the legacy `per_attribute` result files, so existing artifacts remain valid after the refactor. With `--run_dir`, evaluation writes metric files under the run directory and records its effective settings in `eval_config.yaml`.
 
 ---
 
@@ -195,7 +206,7 @@ The fidelity sweep was first run with DDIM (50 steps) for speed, giving the foll
 | 3   | 0.490     | 0.623      | 0.260      | 0.458 |
 | 5   | 0.441     | 0.650      | 0.191      | 0.428 |
 
-Read at face value, this says guidance *hurts* fidelity beyond $w\approx1$ — the opposite of what CFG is supposed to do, and inconsistent with the qualitative grids at low $w$, which look clean and on-attribute. Raising the DDIM step count to 250 did not fix it (checked interactively in `generate_interactive.ipynb`).
+Read at face value, this says guidance *hurts* fidelity beyond $w\approx1$ — the opposite of what CFG is supposed to do, and inconsistent with the qualitative grids at low $w$, which look clean and on-attribute. Raising the DDIM step count to 250 did not fix it (checked interactively in `notebooks/generate_interactive.ipynb`).
 
 Repeating the identical sweep with full ancestral DDPM sampling (same checkpoint, same classifier) gives a very different picture:
 
@@ -210,7 +221,7 @@ With DDPM, mean fidelity *rises* with $w$ and plateaus around 0.84–0.86 — th
 
 **Diagnosis.** The two samplers use the *same* trained $\epsilon_\theta$ and the *same* guided noise $\hat\epsilon$ (Eq. 5) — the discrepancy is purely a property of *how* that noise is used to step through the chain. DDIM reconstructs $\hat{\mathbf{x}}_0 = (\mathbf{x}_t - \sqrt{1-\bar\alpha_t}\,\epsilon)/\sqrt{\bar\alpha_t}$ explicitly at every step; at high $t$ this coefficient is large (e.g. $\approx 157$ at $t=999$ for this schedule), so the extrapolation error introduced by the guided (and therefore off-manifold) $\hat\epsilon$ is amplified and clipped, injecting high-frequency artifacts that compound over the sub-sampled trajectory. DDPM's ancestral update never forms $\hat{\mathbf{x}}_0$ explicitly and takes 1000 small steps instead of 50–250 larger ones, so the same guided noise is applied far more gradually and does not blow up the same way.
 
-**Decision.** DDIM is abandoned as the sampler for all reported results in this project. `ddim_sample` remains in `diffusion.py` purely for documentation and as a fast (but qualitatively unreliable under guidance) preview tool during development; every number and figure in this report is produced with `ddpm_sample`. Both `evaluate.py` and `evaluate100k.py` expose `--sampler {ddim,ddpm}` precisely to make this choice explicit and reproducible.
+**Decision.** DDIM is abandoned as the sampler for all reported results in this project. `ddim_sample` remains in `diffusion.py` purely for documentation and as a fast (but qualitatively unreliable under guidance) preview tool during development; every number and figure in this report is produced with `ddpm_sample`. The evaluation wrappers expose `--sampler {ddim,ddpm}` precisely to make this choice explicit and reproducible.
 
 ### 5.2 Result table (DDPM, 10k, 40k steps)
 
@@ -221,17 +232,19 @@ With DDPM, mean fidelity *rises* with $w$ and plateaus around 0.84–0.86 — th
 | 3   | 0.813     | 1.000      | 0.758      | 0.857 |
 | 5   | 0.758     | 1.000      | 0.773      | 0.844 |
 
-`hair_color` saturates at $w\geq3$ (ceiling effect: the classifier is essentially always right once guidance is on), while `eye_color` and `face_color` continue to benefit from moderate guidance and plateau rather than degrade, at least up to $w=5$. Whether fidelity eventually degrades at higher $w$ (as diversity collapses) under DDPM is an open question addressed in Section 6.
+`hair_color` saturates at $w\geq3$ (ceiling effect: the classifier is essentially always right once guidance is on), while `eye_color` and `face_color` benefit from moderate guidance and then begin to degrade at higher weights. The extended sweep in the tracked result files shows the expected CFG trade-off more clearly: mean fidelity peaks around $w=3$--$5$ and falls again by $w=15$.
 
 ---
 
 ## 6. Current status and next steps
 
-All six modules are written and validated end-to-end, and the full 40k-step training run on the 10k-image dataset is complete on the desktop GPU (GTX 1080, 8 GB). The guidance-weight sweep has been run to completion with both samplers, revealing the DDIM sampling artifact documented in Section 5.1; all further evaluation uses DDPM.
+The implementation has been refactored into a reproducible `uv` project with a package layout, compatibility wrappers for the original commands, unified 10k/100k dataset handling, YAML experiment configs, run directories, resumable training, DDPM/DDIM sampler selection, typed result objects, and plotting that supports both old and new result schemas.
 
-Remaining and follow-up work:
+The tracked result artifacts now include:
 
-- **Higher-$w$ sweep under DDPM** (e.g. $w \in \{8, 10, 15\}$) to check whether fidelity eventually degrades once guidance is pushed far enough, or whether the plateau observed at $w=3$–$5$ (Section 5.2) simply continues — this distinguishes "CFG has a genuine ceiling on this dataset" from "the ceiling in the DDIM evaluation was entirely a sampler artifact."
-- **Perceptual/diversity check.** Fidelity alone cannot detect mode collapse: a model could satisfy the requested attribute by generating near-identical images. A simple pairwise diversity metric (e.g. average LPIPS or pixel-distance between same-condition samples) across $w$ would confirm whether the DDPM plateau also preserves within-condition variety, or whether high $w$ trades diversity for fidelity even without the DDIM artifact.
-- **100k-dataset run** (`train100k.py`, `evaluate100k.py`) as a comparison baseline against the 10k result, now that the sampler choice is fixed to DDPM.
-- **Project presentation** covering the full pipeline and, in particular, the DDIM-vs-DDPM finding as a methodological result in its own right.
+- **10k DDPM high-weight sweep** over $w \in \{0,1,3,5,8,10,15\}$, showing a peak around moderate guidance and degradation by very high guidance.
+- **Diversity and variance checks** for the 10k run, so the fidelity curve is not read in isolation.
+- **100k comparison runs** for fidelity, diversity, and variance, using the same DDPM-first evaluation path.
+- **DDIM-vs-DDPM artifact files** retained to support the methodological discussion in Section 5.1.
+
+Remaining presentation work is mostly editorial: choose the final plots, decide whether to foreground the DDIM-vs-DDPM finding as a methodological result, and keep the oral explanation focused on why classifier-free guidance is the extension beyond the unconditional DDPM material.

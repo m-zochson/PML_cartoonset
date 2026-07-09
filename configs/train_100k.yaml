@@ -1,0 +1,15 @@
+dataset_variant: 100k
+root: data/cartoonset100k
+attrs:
+  - eye_color
+  - hair_color
+  - face_color
+image_size: 32
+batch: 128
+steps: 40000
+lr: 0.0002
+timesteps: 1000
+p_uncond: 0.1
+workers: 0
+cache: true
+run_dir: runs/run100k

@@ -1,4 +1,4 @@
-"""Backward-compatible wrapper for `cartoon_diffusion.cli.plot_results`."""
+"""Canonical plotting CLI wrapper."""
 
 from cartoon_diffusion.cli.plot_results import main
 

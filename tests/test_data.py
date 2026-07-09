@@ -25,6 +25,8 @@ def test_cartoon_dataset_parses_labels_and_images(tmp_path):
 
     assert len(ds) == 2
     assert ds.attribute_dims == [5, 10, 11]
+    assert len(ds.paths) == 2
+    assert ds.paths[0].endswith(".png")
     img, label = ds[0]
     assert img.shape == (3, 8, 8)
     assert img.min() >= -1 and img.max() <= 1

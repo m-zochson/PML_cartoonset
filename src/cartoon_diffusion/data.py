@@ -109,8 +109,7 @@ class CartoonSetDataset(Dataset):
         self.labels = labels_all[:, cols].long()
         self.images = images
         self._all_attr_names = all_attr_names
-        if self.images is None:
-            self.paths = [str(Path(self.root) / rp) for rp in self._rel_paths]
+        self.paths = [str(Path(self.root) / rp) for rp in self._rel_paths]
 
     def _discover_pairs(self, pngs: list[str]):
         paths, labels_raw = [], []

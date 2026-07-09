@@ -7,11 +7,14 @@ captioned with the full attribute triple it was CONDITIONED on plus the guidance
 weight, so the grid is self-documenting: you can read off exactly what each
 generated image was asked to be.
 
+Sampling uses full DDPM ancestral sampling (the reverse chain runs over all
+`timesteps` steps stored in the checkpoint); there is no step-count knob.
+
     # one annotated grid per attribute (grid_eye_color.png, grid_hair_color.png, ...)
-    python sample.py --ckpt ckpt.pt --vary all --weights 0 1 3 5 --steps 50
+    python sample.py --ckpt ckpt.pt --vary all --weights 0 1 3 5
 
     # just one attribute
-    python sample.py --ckpt ckpt.pt --vary hair_color --weights 0 1 3 5 --steps 50 --out grid_hair.png
+    python sample.py --ckpt ckpt.pt --vary hair_color --weights 0 1 3 5 --out grid_hair.png
 
 Other (non-varied) attributes are held fixed via --fixed (default all 0); the
 grid title records their values. Attribute VALUES are shown as integer indices
@@ -125,7 +128,7 @@ def build_annotated_grid(cols, labels_per_row, attrs, vary_idx, weights,
 
 @torch.no_grad()
 def sample_one_attribute(model, diff, attrs, dims, image_size, vary_idx,
-                         fixed, weights, steps, seed, device):
+                         fixed, weights, seed, device):
     """Return list-of-columns (denormalized [0,1] tensors) and the row labels."""
     n_rows = dims[vary_idx]
     base = torch.tensor(fixed, device=device)
@@ -134,9 +137,12 @@ def sample_one_attribute(model, diff, attrs, dims, image_size, vary_idx,
 
     cols = []
     for w in weights:
-        torch.manual_seed(seed)  # same start noise per row across weights
-        imgs = diff.ddim_sample(model, labels, image_size=image_size,
-                                guidance_weight=w, steps=steps)
+        # reseed before every weight so the whole DDPM trajectory (initial noise
+        # AND the per-step ancestral noise) is identical across weight columns,
+        # making the columns directly comparable.
+        torch.manual_seed(seed)
+        imgs = diff.ddpm_sample(model, labels, image_size=image_size,
+                                guidance_weight=w)
         cols.append(denormalize(imgs).cpu())
     return cols, labels.cpu()
 
@@ -148,7 +154,6 @@ def main():
                     help="attribute to vary down the rows, or 'all' to produce "
                          "one grid per attribute (default: all)")
     ap.add_argument("--weights", type=float, nargs="+", default=[0, 1, 3, 5])
-    ap.add_argument("--steps", type=int, default=50)
     ap.add_argument("--fixed", type=int, nargs="+", default=None,
                     help="values for the non-varied attributes (default all 0)")
     ap.add_argument("--seed", type=int, default=0)
@@ -185,7 +190,7 @@ def main():
     for vary_idx in targets:
         cols, labels = sample_one_attribute(
             model, diff, attrs, dims, image_size, vary_idx,
-            fixed, args.weights, args.steps, args.seed, device)
+            fixed, args.weights, args.seed, device)
         grid = build_annotated_grid(cols, labels, attrs, vary_idx,
                                     args.weights, fixed, cell=args.cell)
 

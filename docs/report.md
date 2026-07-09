@@ -164,6 +164,9 @@ A standard loop (Adam, $\text{lr} = 2\times10^{-4}$) with two additions relevant
 
 - **EMA** (exponential moving average, decay $0.999$) of the model weights. Diffusion samples are noticeably cleaner from EMA weights, so a shadow copy is maintained and saved alongside the raw weights.
 - **Checkpointing and resume.** Every `--save_every` steps the full state (raw + EMA weights, optimizer state, attribute dims, image size, timesteps) is saved. If `--ckpt` is omitted, a timestamped filename is generated so separate runs never collide; a one-level `.bak` rotation guards against a single accidental overwrite. Old checkpoints without optimizer state still load, with a warning when resuming.
+- **Learning-rate schedule.** Training supports either a constant learning rate or cosine decay via `--lr_schedule {constant,cosine}`. The cosine schedule is computed from the absolute step, so resumed runs continue with the correct rate.
+- **Mixed precision.** Training can be run in `fp32`, `fp16`, or `bf16` via the config file or `--precision`; `fp16` uses gradient scaling, while `bf16` uses autocast directly on supported CUDA devices.
+- **Gradient clipping.** The full training configs clip the global gradient norm at `1.0`, which acts as a conservative safety net for occasional diffusion-loss spikes, especially under mixed precision.
 
 The single training CLI supports both `--dataset_variant 10k` and `--dataset_variant 100k`; `train.py` and `train100k.py` are thin wrappers around this implementation. Reusable YAML configs live under `configs/`, and `--run_dir` stores a run-local checkpoint path plus the effective training config.
 

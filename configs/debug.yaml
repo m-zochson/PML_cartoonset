@@ -7,6 +7,10 @@ attrs:
 image_size: 32
 batch: 16
 steps: 20
+lr_schedule: constant
+min_lr: 0.0
+precision: fp32
+grad_clip:
 timesteps: 1000
 limit: 64
 workers: 0

@@ -103,6 +103,38 @@ Train on 10k:
 uv run python scripts/train.py --config configs/train_10k_40k.yaml
 ```
 
+Training precision is controlled by `precision:` in the YAML config or by
+`--precision` on the command line. Valid values are `fp32`, `fp16`, and `bf16`;
+the full training configs default to `bf16`. For example:
+
+```bash
+uv run python scripts/train.py --config configs/train_10k_40k.yaml --precision bf16
+uv run python scripts/train.py --config configs/train_10k_40k.yaml --precision fp16
+```
+
+Use `fp16` instead if the CUDA device does not support bf16.
+
+The learning-rate schedule is controlled by:
+
+```yaml
+lr_schedule: constant   # or cosine
+min_lr: 0.0             # cosine floor
+```
+
+For a cosine decay run:
+
+```bash
+uv run python scripts/train.py --config configs/train_10k_40k.yaml --lr_schedule cosine --min_lr 1e-5
+```
+
+The full training configs also enable conservative global gradient clipping:
+
+```yaml
+grad_clip: 1.0
+```
+
+Set it to an empty value or override with `--grad_clip` to change it.
+
 Train or resume on 100k:
 
 ```bash

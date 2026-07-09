@@ -5,9 +5,13 @@ attrs:
   - hair_color
   - face_color
 image_size: 32
-batch: 128
+batch: 64
 steps: 40000
 lr: 0.0002
+lr_schedule: constant
+min_lr: 0.0
+precision: bf16
+grad_clip: 1.0
 timesteps: 1000
 p_uncond: 0.1
 workers: 4

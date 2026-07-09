@@ -31,6 +31,30 @@ def build_parser() -> argparse.ArgumentParser:
         help="final target step count; with --resume, continues until this total",
     )
     ap.add_argument("--lr", type=float, default=2e-4)
+    ap.add_argument(
+        "--lr_schedule",
+        choices=["constant", "cosine"],
+        default="constant",
+        help="learning-rate schedule",
+    )
+    ap.add_argument(
+        "--min_lr",
+        type=float,
+        default=0.0,
+        help="minimum LR for cosine schedule",
+    )
+    ap.add_argument(
+        "--precision",
+        choices=["fp32", "fp16", "bf16"],
+        default="fp32",
+        help="training precision: fp32, fp16 mixed precision, or bf16 mixed precision",
+    )
+    ap.add_argument(
+        "--grad_clip",
+        type=float,
+        default=None,
+        help="optional global gradient-norm clipping threshold, e.g. 1.0",
+    )
     ap.add_argument("--timesteps", type=int, default=1000)
     ap.add_argument("--p_uncond", type=float, default=0.1)
     ap.add_argument("--limit", type=int, default=None)
@@ -64,6 +88,10 @@ def main(argv: list[str] | None = None) -> None:
         batch=args.batch,
         steps=args.steps,
         lr=args.lr,
+        lr_schedule=args.lr_schedule,
+        min_lr=args.min_lr,
+        precision=args.precision,
+        grad_clip=args.grad_clip,
         timesteps=args.timesteps,
         p_uncond=args.p_uncond,
         limit=args.limit,

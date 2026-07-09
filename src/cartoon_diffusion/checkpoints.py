@@ -23,6 +23,11 @@ def save_checkpoint(
     attribute_dims,
     image_size: int,
     timesteps: int,
+    precision: str | None = None,
+    grad_clip: float | None = None,
+    lr_schedule: str | None = None,
+    min_lr: float | None = None,
+    scaler=None,
 ) -> None:
     """Save a training checkpoint with one-level .bak rotation."""
     path = str(path)
@@ -40,8 +45,18 @@ def save_checkpoint(
         "image_size": image_size,
         "timesteps": timesteps,
     }
+    if precision is not None:
+        payload["precision"] = precision
+    if grad_clip is not None:
+        payload["grad_clip"] = grad_clip
+    if lr_schedule is not None:
+        payload["lr_schedule"] = lr_schedule
+    if min_lr is not None:
+        payload["min_lr"] = min_lr
     if opt is not None:
         payload["opt"] = opt.state_dict()
+    if scaler is not None:
+        payload["scaler"] = scaler.state_dict()
     torch.save(payload, path)
 
 

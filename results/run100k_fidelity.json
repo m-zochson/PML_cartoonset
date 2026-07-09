@@ -1,0 +1,86 @@
+{
+  "meta": {
+    "timestamp": "2026-07-08T20:10:30",
+    "device": "cuda",
+    "test": "fidelity",
+    "dataset_variant": "10k",
+    "root": "data/cartoonset10k",
+    "ckpt": "run100k.pt",
+    "clf_ckpt": "classifier.pt",
+    "attrs": [
+      "eye_color",
+      "hair_color",
+      "face_color"
+    ],
+    "attribute_dims": [
+      5,
+      10,
+      11
+    ],
+    "image_size": 32,
+    "timesteps": 1000,
+    "sampler": "ddpm",
+    "seed": 0,
+    "weights": [
+      0.0,
+      1.0,
+      3.0,
+      5.0,
+      8.0,
+      10.0,
+      15.0
+    ],
+    "n_samples": 256
+  },
+  "results": [
+    {
+      "weight": 0.0,
+      "mean": 0.7799479166666666,
+      "eye_color": 0.62890625,
+      "hair_color": 0.9453125,
+      "face_color": 0.765625
+    },
+    {
+      "weight": 1.0,
+      "mean": 0.8138020833333334,
+      "eye_color": 0.69921875,
+      "hair_color": 0.984375,
+      "face_color": 0.7578125
+    },
+    {
+      "weight": 3.0,
+      "mean": 0.8177083333333334,
+      "eye_color": 0.73046875,
+      "hair_color": 0.99609375,
+      "face_color": 0.7265625
+    },
+    {
+      "weight": 5.0,
+      "mean": 0.81640625,
+      "eye_color": 0.75390625,
+      "hair_color": 1.0,
+      "face_color": 0.6953125
+    },
+    {
+      "weight": 8.0,
+      "mean": 0.8046875,
+      "eye_color": 0.75390625,
+      "hair_color": 0.99609375,
+      "face_color": 0.6640625
+    },
+    {
+      "weight": 10.0,
+      "mean": 0.7955729166666666,
+      "eye_color": 0.734375,
+      "hair_color": 0.98828125,
+      "face_color": 0.6640625
+    },
+    {
+      "weight": 15.0,
+      "mean": 0.7708333333333334,
+      "eye_color": 0.73828125,
+      "hair_color": 0.984375,
+      "face_color": 0.58984375
+    }
+  ]
+}

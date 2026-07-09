@@ -1,0 +1,86 @@
+{
+  "meta": {
+    "timestamp": "2026-07-08T17:22:50",
+    "device": "cuda",
+    "test": "fidelity",
+    "dataset_variant": "10k",
+    "root": "data/cartoonset10k",
+    "ckpt": "run_full_40k.pt",
+    "clf_ckpt": "classifier.pt",
+    "attrs": [
+      "eye_color",
+      "hair_color",
+      "face_color"
+    ],
+    "attribute_dims": [
+      5,
+      10,
+      11
+    ],
+    "image_size": 32,
+    "timesteps": 1000,
+    "sampler": "ddpm",
+    "seed": 0,
+    "weights": [
+      0,
+      1,
+      3,
+      5,
+      8,
+      10,
+      15
+    ],
+    "n_samples": 32
+  },
+  "results": [
+    {
+      "weight": 0,
+      "mean": 0.8020833333333334,
+      "eye_color": 0.59375,
+      "hair_color": 0.9375,
+      "face_color": 0.875
+    },
+    {
+      "weight": 1,
+      "mean": 0.8020833333333334,
+      "eye_color": 0.6875,
+      "hair_color": 0.96875,
+      "face_color": 0.75
+    },
+    {
+      "weight": 3,
+      "mean": 0.8125,
+      "eye_color": 0.71875,
+      "hair_color": 1.0,
+      "face_color": 0.71875
+    },
+    {
+      "weight": 5,
+      "mean": 0.8229166666666666,
+      "eye_color": 0.75,
+      "hair_color": 1.0,
+      "face_color": 0.71875
+    },
+    {
+      "weight": 8,
+      "mean": 0.7916666666666666,
+      "eye_color": 0.6875,
+      "hair_color": 1.0,
+      "face_color": 0.6875
+    },
+    {
+      "weight": 10,
+      "mean": 0.8020833333333334,
+      "eye_color": 0.78125,
+      "hair_color": 1.0,
+      "face_color": 0.625
+    },
+    {
+      "weight": 15,
+      "mean": 0.7708333333333334,
+      "eye_color": 0.71875,
+      "hair_color": 1.0,
+      "face_color": 0.59375
+    }
+  ]
+}

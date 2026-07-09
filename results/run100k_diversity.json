@@ -1,0 +1,66 @@
+{
+  "meta": {
+    "timestamp": "2026-07-08T20:23:33",
+    "device": "cuda",
+    "test": "diversity",
+    "dataset_variant": "10k",
+    "root": "data/cartoonset10k",
+    "ckpt": "run100k.pt",
+    "clf_ckpt": null,
+    "attrs": [
+      "eye_color",
+      "hair_color",
+      "face_color"
+    ],
+    "attribute_dims": [
+      5,
+      10,
+      11
+    ],
+    "image_size": 32,
+    "timesteps": 1000,
+    "sampler": "ddpm",
+    "seed": 0,
+    "weights": [
+      0.0,
+      1.0,
+      3.0,
+      5.0,
+      8.0,
+      10.0,
+      15.0
+    ],
+    "n_conditions": 16,
+    "n_per_condition": 8
+  },
+  "results": [
+    {
+      "weight": 0.0,
+      "diversity": 0.24092022460120335
+    },
+    {
+      "weight": 1.0,
+      "diversity": 0.2455147792601825
+    },
+    {
+      "weight": 3.0,
+      "diversity": 0.258699625402057
+    },
+    {
+      "weight": 5.0,
+      "diversity": 0.2637555297696963
+    },
+    {
+      "weight": 8.0,
+      "diversity": 0.26184318805462686
+    },
+    {
+      "weight": 10.0,
+      "diversity": 0.2600340607043888
+    },
+    {
+      "weight": 15.0,
+      "diversity": 0.24855060269640358
+    }
+  ]
+}

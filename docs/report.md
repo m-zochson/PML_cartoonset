@@ -186,6 +186,10 @@ The evaluation code is split by responsibility:
 
 The unified evaluator exposes a `--sampler {ddpm,ddim}` flag. **`ddpm` is the setting used for every reported number**; `ddim` is retained only to reproduce the sampler-artifact comparison in Section 5.1. The plotting utility reads both the new flat schema and the legacy `per_attribute` result files, so existing artifacts remain valid after the refactor. With `--run_dir`, evaluation writes metric files under the run directory and records its effective settings in `eval_config.yaml`.
 
+### 4.7 Optional supervised upscaling
+
+The codebase also includes an optional presentation-stage upscaler. It is a small supervised CNN trained on real Cartoon Set images: the input is the image resized to $32\times32$, and the target is the same image resized to $96\times96$. The default architecture uses a wider $5\times5$ input convolution, four low-resolution residual blocks, a PixelShuffle $\times3$ upsampling head, two high-resolution refinement blocks, and a final $5\times5$ RGB projection, trained with an L1 plus weighted L2/MSE reconstruction loss. Training supports the same constant/cosine learning-rate switch used by the DDPM trainer. This model is separate from the DDPM and is not part of the probabilistic evaluation; it is intended only to make generated PNGs easier to inspect in figures or slides.
+
 ---
 
 ## 5. Evaluation methodology
@@ -241,7 +245,7 @@ With DDPM, mean fidelity *rises* with $w$ and plateaus around 0.84–0.86 — th
 
 ## 6. Current status and next steps
 
-The implementation has been refactored into a reproducible `uv` project with a package layout, compatibility wrappers for the original commands, unified 10k/100k dataset handling, YAML experiment configs, run directories, resumable training, DDPM/DDIM sampler selection, typed result objects, and plotting that supports both old and new result schemas.
+The implementation has been refactored into a reproducible `uv` project with a package layout, compatibility wrappers for the original commands, unified 10k/100k dataset handling, YAML experiment configs, run directories, resumable training, DDPM/DDIM sampler selection, typed result objects, plotting that supports both old and new result schemas, and an optional supervised `32x32` to `96x96` upscaler for presentation-quality PNGs.
 
 The tracked result artifacts now include:
 

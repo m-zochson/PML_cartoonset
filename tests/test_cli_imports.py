@@ -27,6 +27,8 @@ def test_root_wrappers_help():
         "plot_results.py",
         "run_all_tests.py",
         "dataset.py",
+        "train_upscaler.py",
+        "upscale.py",
     ]:
         _run_help([script])
 
@@ -40,5 +42,7 @@ def test_scripts_help():
         "scripts/sample.py",
         "scripts/plot_results.py",
         "scripts/run_all_tests.py",
+        "scripts/train_upscaler.py",
+        "scripts/upscale.py",
     ]:
         _run_help([script])

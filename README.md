@@ -150,6 +150,29 @@ uv run python scripts/sample.py --run_dir runs/run_full_40k --vary hair_color --
 uv run python scripts/sample.py --run_dir runs/run_full_40k --vary hair_color --weights 0 1 3 5 --sampler ddim --ddim_steps 50
 ```
 
+Optional upscaling. The diffusion model still generates `32x32` images; this
+separate supervised CNN learns to enlarge real Cartoon Set images from `32x32`
+to `96x96` and can be used as presentation-only post-processing for generated
+PNGs. The default architecture uses a `5x5` head convolution, four `3x3`
+residual blocks, PixelShuffle `x3`, two high-resolution `3x3` refinement
+blocks, and a final `5x5` RGB projection. Its reconstruction objective is
+`L1 + l2_weight * MSE`.
+
+```bash
+uv run python scripts/train_upscaler.py --config configs/train_upscaler_96.yaml
+uv run python scripts/train_upscaler.py --config configs/train_upscaler_96.yaml --lr_schedule cosine --min_lr 1e-5
+uv run python scripts/upscale.py --ckpt runs/upscaler_96/checkpoints/latest.pt --input outputs/grids/grid_hair_color.png
+uv run python scripts/upscale.py --ckpt runs/upscaler_96/checkpoints/latest.pt --input_dir outputs/grids
+```
+
+```yaml
+l2_weight: 1.0
+head_kernel: 5
+residual_kernel: 3
+refinement_blocks: 2
+tail_kernel: 5
+```
+
 Run metrics:
 
 ```bash

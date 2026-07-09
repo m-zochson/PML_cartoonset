@@ -84,3 +84,13 @@ def apply_sample_run_dir(args) -> None:
         args.out_dir = str(root / "grids")
     root.mkdir(parents=True, exist_ok=True)
     save_config(root / "sample_config.yaml", vars(args))
+
+
+def apply_upscaler_train_run_dir(args) -> None:
+    if not getattr(args, "run_dir", None):
+        return
+    root = Path(args.run_dir)
+    if args.ckpt is None:
+        args.ckpt = str(root / "checkpoints" / "latest.pt")
+    root.mkdir(parents=True, exist_ok=True)
+    save_config(root / "config.yaml", vars(args))

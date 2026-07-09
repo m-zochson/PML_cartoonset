@@ -29,6 +29,8 @@ cartoon-evaluate = "cartoon_diffusion.cli.evaluate:main"
 cartoon-sample = "cartoon_diffusion.cli.sample_grid:main"
 cartoon-plot = "cartoon_diffusion.cli.plot_results:main"
 cartoon-run-tests = "cartoon_diffusion.cli.run_all_tests:main"
+cartoon-train-upscaler = "cartoon_diffusion.cli.train_upscaler:main"
+cartoon-upscale = "cartoon_diffusion.cli.upscale:main"
 
 [build-system]
 requires = ["hatchling"]

@@ -1,0 +1,24 @@
+root: data/cartoonset10k
+run_dir: runs/upscaler_96
+input_size: 32
+target_size: 96
+channels: 64
+residual_blocks: 4
+refinement_blocks: 2
+head_kernel: 5
+residual_kernel: 3
+up_kernel: 3
+refinement_kernel: 3
+tail_kernel: 5
+batch: 32
+steps: 10000
+lr: 5e-4
+lr_schedule: cosine
+min_lr: 1e-7
+weight_decay: 1e-5
+l2_weight: 1.0
+precision: bf16
+grad_clip: 1.0
+workers: 4
+save_every: 1000
+limit:

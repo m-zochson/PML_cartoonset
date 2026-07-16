@@ -27,7 +27,11 @@ Let $\mathbf{x}_0 \sim p(\mathbf{x}_0)$ be a data sample. The forward process is
 
 $$q(\mathbf{x}_t \mid \mathbf{x}_{t-1}) = \mathcal{N}\!\big(\mathbf{x}_t;\, \sqrt{1-\beta_t}\,\mathbf{x}_{t-1},\, \beta_t \mathbf{I}\big).$$
 
-Define $\alpha_t \coloneqq 1-\beta_t$ and $\bar\alpha_t \coloneqq \prod_{i=1}^{t}\alpha_i$. A key property is that the marginal at *any* step has a closed form. Using the reparameterization $\mathbf{x}_t = \sqrt{\alpha_t}\,\mathbf{x}_{t-1} + \sqrt{1-\alpha_t}\,\epsilon_{t-1}$ recursively and merging the independent Gaussian noises,
+Define $\alpha_t \coloneqq 1-\beta_t$ and $\bar\alpha_t \coloneqq \prod_{i=1}^{t}\alpha_i$. A key property is that the marginal at *any* step has a closed form. Using the reparameterization
+
+$$\mathbf{x}_t = \sqrt{\alpha_t}\,\mathbf{x}_{t-1} + \sqrt{1-\alpha_t}\,\epsilon_{t-1}$$
+
+recursively and merging the independent Gaussian noises,
 
 $$
 \begin{aligned}
@@ -39,7 +43,9 @@ $$
 
 so that
 
-$$q(\mathbf{x}_t \mid \mathbf{x}_0) = \mathcal{N}\!\big(\mathbf{x}_t;\, \sqrt{\bar\alpha_t}\,\mathbf{x}_0,\, (1-\bar\alpha_t)\mathbf{I}\big). \tag{1}$$
+$$q(\mathbf{x}_t \mid \mathbf{x}_0) = \mathcal{N}\!\big(\mathbf{x}_t;\, \sqrt{\bar\alpha_t}\,\mathbf{x}_0,\, (1-\bar\alpha_t)\mathbf{I}\big)$$
+
+*(1)*
 
 As $t \to T$ with $\bar\alpha_T \to 0$, $q(\mathbf{x}_T \mid \mathbf{x}_0) \to \mathcal{N}(\mathbf{0}, \mathbf{I})$: the data is destroyed into white noise, which is the tractable prior we can sample from directly.
 
@@ -47,17 +53,29 @@ As $t \to T$ with $\bar\alpha_T \to 0$, $q(\mathbf{x}_T \mid \mathbf{x}_0) \to \
 
 ### 2.2 Backward process and the denoising parametrization
 
-Generation requires the reverse chain. The true reverse kernel $q(\mathbf{x}_{t-1} \mid \mathbf{x}_t)$ is intractable, so we fit a parametric Gaussian $p_\theta(\mathbf{x}_{t-1} \mid \mathbf{x}_t) = \mathcal{N}(\mathbf{x}_{t-1}; \boldsymbol\mu_\theta(\mathbf{x}_t, t), \Sigma_\theta)$. Crucially, the *posterior conditioned on $\mathbf{x}_0$* is tractable and Gaussian:
+Generation requires the reverse chain. The true reverse kernel
+
+$$q(\mathbf{x}_{t-1} \mid \mathbf{x}_t)$$
+
+is intractable, so we fit a parametric Gaussian
+
+$$p_\theta(\mathbf{x}_{t-1} \mid \mathbf{x}_t) = \mathcal{N}(\mathbf{x}_{t-1}; \boldsymbol\mu_\theta(\mathbf{x}_t, t), \Sigma_\theta).$$
+
+Crucially, the posterior conditioned on $\mathbf{x}_0$ is tractable and Gaussian:
 
 $$q(\mathbf{x}_{t-1} \mid \mathbf{x}_t, \mathbf{x}_0) = \mathcal{N}\!\big(\mathbf{x}_{t-1};\, \tilde{\boldsymbol\mu}_t(\mathbf{x}_t, \mathbf{x}_0),\, \tilde\sigma_t \mathbf{I}\big), \qquad \tilde\sigma_t = \frac{1-\bar\alpha_{t-1}}{1-\bar\alpha_t}\beta_t.$$
 
 Rather than predicting $\mathbf{x}_0$ directly, DDPMs predict the *noise*. Inverting $\mathbf{x}_t = \sqrt{\bar\alpha_t}\,\mathbf{x}_0 + \sqrt{1-\bar\alpha_t}\,\epsilon$ and substituting, the posterior mean can be written purely in terms of the noise $\epsilon$:
 
-$$\tilde{\boldsymbol\mu}_t(\mathbf{x}_t, \epsilon) = \frac{1}{\sqrt{\alpha_t}}\Big(\mathbf{x}_t - \frac{1-\alpha_t}{\sqrt{1-\bar\alpha_t}}\,\epsilon\Big). \tag{2}$$
+$$\tilde{\boldsymbol\mu}_t(\mathbf{x}_t, \epsilon) = \frac{1}{\sqrt{\alpha_t}}\Big(\mathbf{x}_t - \frac{1-\alpha_t}{\sqrt{1-\bar\alpha_t}}\,\epsilon\Big)$$
+
+*(2)*
 
 We therefore train a network $\epsilon_\theta(\mathbf{x}_t, t)$ to predict the noise that was added. The full variational bound simplifies (Ho et al., 2020) to the unweighted denoising objective:
 
-$$L(\theta) = \mathbb{E}_{t,\mathbf{x}_0,\epsilon}\Big[\big\|\,\epsilon - \epsilon_\theta\big(\sqrt{\bar\alpha_t}\,\mathbf{x}_0 + \sqrt{1-\bar\alpha_t}\,\epsilon,\, t\big)\big\|^2\Big]. \tag{3}$$
+$$L(\theta) = \mathbb{E}_{t,\mathbf{x}_0,\epsilon}\Big[\big\|\,\epsilon - \epsilon_\theta\big(\sqrt{\bar\alpha_t}\,\mathbf{x}_0 + \sqrt{1-\bar\alpha_t}\,\epsilon,\, t\big)\big\|^2\Big]$$
+
+*(3)*
 
 Here $t$ is drawn uniformly over $\{1, \dots, T\}$, $\mathbf{x}_0$ from the dataset, and $\epsilon \sim \mathcal{N}(\mathbf{0}, \mathbf{I})$. Predicting a target that is marginally standard-normal is empirically easier to optimize than predicting $\mathbf{x}_0$.
 
@@ -65,7 +83,9 @@ Here $t$ is drawn uniformly over $\{1, \dots, T\}$, $\mathbf{x}_0$ from the data
 
 Given a trained $\epsilon_\theta$, we start from $\mathbf{x}_T \sim \mathcal{N}(\mathbf{0}, \mathbf{I})$ and iterate the reverse step for $t = T, \dots, 1$ using (2):
 
-$$\mathbf{x}_{t-1} = \frac{1}{\sqrt{\alpha_t}}\Big(\mathbf{x}_t - \frac{\beta_t}{\sqrt{1-\bar\alpha_t}}\,\epsilon_\theta(\mathbf{x}_t, t)\Big) + \sqrt{\beta_t}\,\mathbf{z}, \qquad \mathbf{z} \sim \mathcal{N}(\mathbf{0}, \mathbf{I}), \tag{4}$$
+$$\mathbf{x}_{t-1} = \frac{1}{\sqrt{\alpha_t}}\Big(\mathbf{x}_t - \frac{\beta_t}{\sqrt{1-\bar\alpha_t}}\,\epsilon_\theta(\mathbf{x}_t, t)\Big) + \sqrt{\beta_t}\,\mathbf{z}, \qquad \mathbf{z} \sim \mathcal{N}(\mathbf{0}, \mathbf{I})$$
+
+*(4)*
 
 with $\mathbf{z} = \mathbf{0}$ at the last step. The implementation uses $\sigma_t^2 = \beta_t$ (one of the two variances proposed by Ho et al.), which is simple and works well in practice.
 
@@ -85,7 +105,11 @@ With $\eta = 0$ the process is deterministic and typically needs only $50$–$10
 
 **Conditional model.** We make the network depend on a condition $c$ (the attributes): $\epsilon_\theta(\mathbf{x}_t, t, c)$. Everything above carries over unchanged; $c$ is simply an extra input.
 
-**Score view.** Noise prediction is equivalent to score estimation: $\epsilon_\theta(\mathbf{x}_t, t) \approx -\sqrt{1-\bar\alpha_t}\,\nabla_{\mathbf{x}_t}\log q(\mathbf{x}_t)$. For the conditional case, Bayes' rule gives
+**Score view.** Noise prediction is equivalent to score estimation:
+
+$$\epsilon_\theta(\mathbf{x}_t, t) \approx -\sqrt{1-\bar\alpha_t}\,\nabla_{\mathbf{x}_t}\log q(\mathbf{x}_t)$$
+
+For the conditional case, Bayes' rule gives
 
 $$\nabla_{\mathbf{x}_t}\log p(\mathbf{x}_t \mid c) = \nabla_{\mathbf{x}_t}\log p(\mathbf{x}_t) + \nabla_{\mathbf{x}_t}\log p(c \mid \mathbf{x}_t).$$
 
@@ -97,9 +121,15 @@ $$\tilde\nabla = \nabla\log p(\mathbf{x}_t \mid c) + w\big(\nabla\log p(\mathbf{
 
 Translating back to noise predictions, the *guided noise* used at sampling time is
 
-$$\hat\epsilon = (1+w)\,\epsilon_\theta(\mathbf{x}_t, t, c) - w\,\epsilon_\theta(\mathbf{x}_t, t, \varnothing), \tag{5}$$
+$$\hat\epsilon = (1+w)\,\epsilon_\theta(\mathbf{x}_t, t, c) - w\,\epsilon_\theta(\mathbf{x}_t, t, \varnothing)$$
 
-where $\varnothing$ is a special *null* condition standing for "unconditional". Both the conditional term $\epsilon_\theta(\cdot, c)$ and the unconditional term $\epsilon_\theta(\cdot, \varnothing)$ come from the *same* network. To make this possible, during training the condition is replaced by $\varnothing$ with a small probability $p_\text{uncond}$ (condition dropout), so the single network learns both models jointly.
+*(5)*
+
+where $\varnothing$ is a special *null* condition standing for "unconditional". Both the conditional term and the unconditional term below come from the *same* network:
+
+$$\epsilon_\theta(\cdot, c) \qquad \text{and} \qquad \epsilon_\theta(\cdot, \varnothing).$$
+
+To make this possible, during training the condition is replaced by $\varnothing$ with a small probability $p_\text{uncond}$ (condition dropout), so the single network learns both models jointly.
 
 > **Reading the guidance weight $w$.** $w=0$ recovers the plain conditional model. Increasing $w$ pushes samples toward regions where the requested attribute is more strongly expressed, improving *attribute fidelity* but eventually reducing diversity and introducing artifacts. The sweet spot is found empirically — and measuring it is exactly what the evaluation script does.
 
